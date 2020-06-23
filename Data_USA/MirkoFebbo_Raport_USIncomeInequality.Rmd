@@ -1,0 +1,303 @@
+---
+title: "US_income_inequalitits"
+author: "Mirko Febbo"
+date: "23/06/2020"
+output: pdf_document
+---
+
+Introduction
+
+This project and ambition to take the certificate came from the idea to create art pieces with the tools explored in class data and machine learning. This would help my art practice to conceptualise sensitive idea with data. In this particular project I want to look at the income inequality that grew since the 1970 and it’s intimate link with neoliberalism. With the prediction, the data and the process I am planing make creative visual that might be 3D printable. 
+
+For this report, we will only be looking at the data science and forecasts parts of the project. 
+
+Data wrangaling
+
+For the data I combined two sources of data  “World Inequality Database” (WID) and “United Nation: World Population Prospect” (UN). The WID website let me select the country, their respective class share of income by year and the average individual GDP. Mixed with the yearly population database from the UN I could make the average yearly income of the United States classes. Which consist of 1%, 10%, 40%, 50% of the population, I have chosen not to consider the 10% as I mainly want to 
+compare the lower classes with the top one.
+
+```{r}
+head(mts)
+```
+
+Since we are working with prediction in the future, I have chosen to work with a time serie data to better make my predictions. We see that the mts data set is composed of 3 variables of a time series starting in 1950 with a frequency of 1 since it is not seasonal data.
+
+Time series matrix data set.
+```{r}
+class(mts)
+```
+
+Here are the 3 variable curved compared with eachother. At first glance we could belive that the growth over the year is actualy quite slow.
+```{r mts, echo=FALSE}
+plot(mts)
+```
+
+But once we compare them in the same graph we notice that the difference is so marginal for the top 1% that it completly eclipse the other 90% of the population.
+```{r mts, echo=FALSE}
+theme_set(theme_bw())
+autoplot(mts) + 
+  ggtitle("Time Series Plot") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Causality Forecasts
+
+To start off we needed to figure out if the data is stationary. Thus we run an augmented Dicley-Fuller test . Looking at the augmented Dickey-Fuller test we see that the p-value are very different from one income to another. 
+
+```{r}
+apply(mts, 2, adf.test, k = 8) 
+```
+
+To make the data stationary we will be working with the diffrencial of our income.
+
+```{r}
+plot.ts(dmts)
+```
+
+```{r}
+autoplot(ts(dmts,
+            start = 1950)) +
+ggtitle("Time Series of the stationary income")
+```
+
+We then identify the lag order, and make the dataset a variable so we can do a serial test. The serial test will make a residual diagnostics. Thus we will be able to select the variable with a granger test for causality. And for this to give reliable result we need all the variables of the multivariate time serie to be stationary. 
+
+```{r}
+summary(var.a)
+```
+
+```{r}
+serial.test(var.a)
+```
+```{r}
+causality(var.a, 
+          cause = c("top1"))
+
+causality(var.a, 
+          cause = c("middle40"))
+
+causality(var.a, 
+          cause = c("bottom50"))
+```
+Well apparently the incomes have no causality with eachother. But since I am more a visual guy let's look at what the graphics says.
+```{r}
+plot(fcast)
+```
+All right so we can see that thoes prediction look quite flat, and when we reverted them from the differencial and plot them with the test set they look quite disapointing.
+
+```{r}
+ggplot() +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("top1"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("top1"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("top1"),
+                x = seq(61, 69)), color = "green") +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("middle40"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "green") +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("bottom50"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "green") +
+  ggtitle("Plot of forecast of the income inequality") +
+  xlab("Time") + ylab("Value")
+```
+```{r}
+ggplot() +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("middle40"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "green") +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("bottom50"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "green") +
+  ggtitle("Plot of forecast of the income inequality in the 90%") +
+  xlab("Time") + ylab("Value")
+```
+
+
+Mean, Naive and Random Walk Forecasting
+
+Here we be doing multiple simple forecast comparison on each income. Since we already figured out that they can be treated seperatly.
+
+Firstly, we will be applying a mean forecast error. As the difference between the actual or real and the predicted or forecast value of a time serie.
+
+secondly, we will look at the random walk forecasting. It considere the variable would take a random step from the last value.
+
+Lastly, we have the random walk with drift, that takes in account the trend that is assumed to be constant.
+
+```{r}
+# plot the forecasts for the top 1%
+autoplot(window(ts(incomeIndividual[,2], start = 1950),start = 1950)) +
+  autolayer(infit1, series = "mean", PI = FALSE) +
+  autolayer(infit2, series = "Naive", PI = FALSE) +
+  autolayer(infit3, series = "drift", PI = FALSE) +
+  xlab("year") + ylab("income") +
+  ggtitle("forecasts comparasion top 1%") + 
+  guides(color = guide_legend(title = "forecast"))
+# plot the forecasts for the middle 40%%
+autoplot(window(ts(incomeIndividual[,3], start = 1950),start = 1950)) +
+  autolayer(infit1, series = "mean", PI = FALSE) +
+  autolayer(infit2, series = "Naive", PI = FALSE) +
+  autolayer(infit3, series = "drift", PI = FALSE) +
+  xlab("year") + ylab("income") +
+  ggtitle("forecasts comparasion middle 40%") + 
+  guides(color = guide_legend(title = "forecast"))
+# plot the forecasts for the bottom 50%
+autoplot(window(ts(incomeIndividual[,4], start = 1950),start = 1950)) +
+  autolayer(infit1, series = "mean", PI = FALSE) +
+  autolayer(infit2, series = "Naive", PI = FALSE) +
+  autolayer(infit3, series = "drift", PI = FALSE) +
+  xlab("year") + ylab("income") +
+  ggtitle("forecasts comparasion bottom 50%") + 
+  guides(color = guide_legend(title = "forecast"))
+```
+
+We will aslo test the accuracy even tho visualy it makes quite alot of sense.
+
+```{r}
+#top 1% accuracy for the RWF with Drift
+accuracy(infit3, int1.2)
+#middle 40% accuracy for the RWF with Drift
+accuracy(infit3, int1.2)
+#bottom 50% accuracy for the RWF with Drift
+accuracy(infit3, int1.2)
+```
+
+Auto select ARIMA
+
+Apparenly the random walk forecast with drift is a type of ARIMA model with value set as (0,1,0).So seeing the ARIMA model performance we will be improving upon it. To build an autonomous AIRMA model where the best value of the ARIMA where selected depending on the data. I started by running a couple of ACF and PACF on the data to better understand the relationship of the lags. 
+
+```{r}
+acf(mts)
+lapply(mts, pacf)
+acf(log(mts))
+```
+For the moment we only realy see a relationship with the previous lag, which is why the ACF test is such a bieutifull slow slop down, because every lag is only related to the one before him. Let's se if we can improve it. 
+```{r}
+acf(diff(log(mts)))
+pacf(diff(log(mts)))
+```
+
+There seams to be a bit more activity there! 
+  ps: you have to be as tall as the blue line to enter
+
+Here we are looking to display any correlation between a series and its lags that could be explained by previous lags
+```{r}
+lapply(mts, function(x){
+  pacf(diff(x))
+})
+```
+
+Here we have the prediction from the auto ARIMA model, and we can see in the title the optimal AIRMA settings.
+```{r}
+for1 <- forecast(fit1, h = 8); plot(for1)
+for2 <- forecast(fit2, h = 8); plot(for2)
+for3 <- forecast(fit3, h = 8); plot(for3)
+```
+
+Let's see how it compare to the original data
+```{r}
+ggplot() +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("top1"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("top1"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("top1"),
+                x = seq(61, 69)), color = "green") +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("middle40"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "green") +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("bottom50"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "green") +
+  ggtitle("Plot ARIMA forecast of the income inequality") +
+  xlab("Time") + ylab("Value")
+
+#plot the income inequality of the 90%
+ggplot() +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("middle40"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("middle40"),
+                x = seq(61, 69)), color = "green") +
+  geom_line(data = incomeIndividual[1:61,], 
+            aes(y = get("bottom50"),
+                x = seq(1, 61)), color = "black") +
+  geom_line(data = incomeF[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "red") +
+  geom_line(data = incomeIndividual[61:69,], 
+            aes(y = get("bottom50"),
+                x = seq(61, 69)), color = "green") +
+  ggtitle("Plot ARIMA forecast of the income inequality in the 90%") +
+  xlab("Time") + ylab("Value")
+```
+
+Conclusion
+By the end of all of our iterations and improvements, we were able to achieve fairly good. We looked at if a correlation forecast could work, to then proceed to test multiple simple forecast to understand that the ARIMA would be our best bet. Thus all that was needed to do is find the best value of the ARIMA that would better fit the model. With this model in the pocket it could very well compliment my work considering that we could predict indefinitely. By making the model predict on himself wich will give us a nice caricatured prediction of a possible reality.
+
+
+https://wid.world/data/
+https://population.un.org/wpp/Download/Standard/CSV/
+https://www.mirkofebbo.com/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
